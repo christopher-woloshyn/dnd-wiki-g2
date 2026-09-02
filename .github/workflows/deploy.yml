@@ -20,4 +20,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/christopher-woloshyn/dnd-wiki:latest
+          tags: ghcr.io/christopher-woloshyn/dnd-wiki-g2:latest
