@@ -6,12 +6,12 @@ import re
 # Configuration & Paths
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_DIR = r"C:\Users\cjw92\OpenCloud\Personal\DnD\Daggerheart H1\Session Journal"
+INPUT_DIR = r"C:\Users\cjw92\OpenCloud\Personal\DnD\DnD G2\Session Journal"
 OUTPUT_DIR = os.path.join(BASE_DIR, "public", "session-journal")
 SESSION_DATA_JS = os.path.join(BASE_DIR, "public", "js", "sessionData.js")
 SESSION_JOURNAL_HTML = os.path.join(BASE_DIR, "public", "session-journal.html")
 
-EXCLUDED_KEYWORDS = ["commune", "letter", "secret"]
+EXCLUDED_KEYWORDS = ["secret"]
 
 # ==========================================
 # HTML Templates
@@ -281,8 +281,7 @@ def main():
     # 3. Generate sessionData.js
     js_entries = []
     for s in all_sessions:
-        full_title = f"{s['group_name']}: {s['title']}"
-        js_entries.append(f'  {{ file: "{s["file_path"]}", title: "{full_title}" }},')
+        js_entries.append(f'  {{ file: "{s["file_path"]}", title: "{s["title"]}" }},')
 
     js_content = "export const campaignSessions = [\n" + "\n".join(js_entries) + "\n];\n"
     with open(SESSION_DATA_JS, "w", encoding="utf-8") as f:
