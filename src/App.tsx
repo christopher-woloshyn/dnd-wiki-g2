@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CampaignData } from './types/campaign';
 import rawData from './data/campaignData.json';
@@ -8,7 +7,7 @@ import { SessionView } from './pages/SessionView';
 
 const campaignData = rawData as CampaignData;
 
-export const App: React.FC = () => {
+export const App = () => {
   return (
     <BrowserRouter>
       <div className="site-container">

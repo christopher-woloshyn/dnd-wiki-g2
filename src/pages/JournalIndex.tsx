@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { CampaignData } from '../types/campaign';
 import { ArcAccordion } from '../components/ArcAccordion';
@@ -7,7 +7,7 @@ interface JournalIndexProps {
   data: CampaignData;
 }
 
-export const JournalIndex: React.FC<JournalIndexProps> = ({ data }) => {
+export const JournalIndex = ({ data }: JournalIndexProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [openArcs, setOpenArcs] = useState<Record<string, boolean>>({});
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArcData } from '../types/campaign';
 
@@ -9,12 +8,12 @@ interface ArcAccordionProps {
   filteredSessionIds?: Set<string>;
 }
 
-export const ArcAccordion: React.FC<ArcAccordionProps> = ({
+export const ArcAccordion = ({
   arc,
   isOpen,
   onToggle,
   filteredSessionIds,
-}) => {
+}: ArcAccordionProps) => {
   const visibleSessions = filteredSessionIds
     ? arc.sessions.filter((s) => filteredSessionIds.has(s.id))
     : arc.sessions;

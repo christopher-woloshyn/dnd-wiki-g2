@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { SessionData } from '../types/campaign';
 
@@ -9,12 +8,12 @@ interface SessionNavBarProps {
   position?: 'top' | 'bottom';
 }
 
-export const SessionNavBar: React.FC<SessionNavBarProps> = ({
+export const SessionNavBar = ({
   sessions,
   currentIndex,
   onNavigate,
   position = 'bottom',
-}) => {
+}: SessionNavBarProps) => {
   const navigate = useNavigate();
   const currentSession = sessions[currentIndex];
   const prevSession = currentIndex > 0 ? sessions[currentIndex - 1] : null;

@@ -7,11 +7,12 @@ import sys
 # ==========================================
 # Configuration & Paths
 # ==========================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Default to the local notes path, but allow environment or command line override
-DEFAULT_INPUT_DIR = r"C:\Users\cjw92\OpenCloud\Personal\DnD\DnD G2\Session Journal"
-INPUT_DIR = os.environ.get("DND_NOTES_DIR", sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT_DIR)
+INPUT_DIR = os.environ.get("DND_NOTES_DIR", sys.argv[1] if len(sys.argv) > 1 else None)
+if not INPUT_DIR:
+    print("Error: Input directory must be provided via DND_NOTES_DIR env var or command line argument.")
+    sys.exit(1)
 
 OUTPUT_JSON = os.path.join(BASE_DIR, "src", "data", "campaignData.json")
 

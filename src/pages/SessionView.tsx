@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { CampaignData } from '../types/campaign';
 import { SessionNavBar } from '../components/SessionNavBar';
@@ -7,7 +7,7 @@ interface SessionViewProps {
   data: CampaignData;
 }
 
-export const SessionView: React.FC<SessionViewProps> = ({ data }) => {
+export const SessionView = ({ data }: SessionViewProps) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 

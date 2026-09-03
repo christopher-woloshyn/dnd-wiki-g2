@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "generate": "python3.11 markdown_parse.py"
+    "generate": "python3.11 scripts/markdown_parse.py"
   },
   "dependencies": {
     "lucide-react": "^0.441.0",
