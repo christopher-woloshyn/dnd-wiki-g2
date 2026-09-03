@@ -1,81 +1,22 @@
 import html
+import json
 import os
 import re
+import sys
 
 # ==========================================
 # Configuration & Paths
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_DIR = r"C:\Users\cjw92\OpenCloud\Personal\DnD\DnD G2\Session Journal"
-OUTPUT_DIR = os.path.join(BASE_DIR, "public", "session-journal")
-SESSION_DATA_JS = os.path.join(BASE_DIR, "public", "js", "sessionData.js")
-SESSION_JOURNAL_HTML = os.path.join(BASE_DIR, "public", "session-journal.html")
+
+# Default to the local notes path, but allow environment or command line override
+DEFAULT_INPUT_DIR = r"C:\Users\cjw92\OpenCloud\Personal\DnD\DnD G2\Session Journal"
+INPUT_DIR = os.environ.get("DND_NOTES_DIR", sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT_DIR)
+
+OUTPUT_JSON = os.path.join(BASE_DIR, "src", "data", "campaignData.json")
 
 EXCLUDED_KEYWORDS = ["secret"]
 
-# ==========================================
-# HTML Templates
-# ==========================================
-SESSION_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
-  <link rel="stylesheet" href="/css/styles.css">
-</head>
-<body>
-  <div class="site-container">
-    <div id="sidebar-container"></div>
-
-    <main class="content">
-      <nav class="session-nav-bar">
-        <a class="prev-session" href="#">← Previous</a>
-        <select class="session-select"></select>
-        <a class="next-session" href="#">Next →</a>
-      </nav>
-
-      <h1>{title}</h1>
-
-{content}
-
-      <nav class="session-nav-bar">
-        <a class="prev-session" href="#">← Previous</a>
-        <select class="session-select"></select>
-        <a class="next-session" href="#">Next →</a>
-      </nav>
-    </main>
-  </div>
-
-  <script src="/js/loadMenu.js"></script>
-  <script type="module" src="/js/sessions.js"></script>
-</body>
-</html>
-"""
-
-JOURNAL_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Session Journal</title>
-  <link rel="stylesheet" href="/css/styles.css">
-</head>
-<body>
-  <div class="site-container">
-    <div id="sidebar-container"></div>
-
-    <main class="content">
-      <h1>Session Journal</h1>
-{arc_sections}
-    </main>
-  </div>
-
-  <script src="/js/loadMenu.js"></script>
-  <script type="module" src="/js/sessions.js"></script>
-</body>
-</html>
-"""
 
 # ==========================================
 # Parsing Helpers
@@ -95,14 +36,21 @@ def parse_inline(text: str) -> str:
     # Italic
     escaped = re.sub(r"\*(.+?)\*", r"<em>\1</em>", escaped)
     escaped = re.sub(r"(?<!\w)_(.+?)_(?!\w)", r"<em>\1</em>", escaped)
-    # Links
+    # Standard Markdown Links
     escaped = re.sub(
-        r"\[(.+?)\]\(((?:https?://\vert{}/)[^\s)]+)\)",
-        r'<a href="\2">\1</a>',
+        r"\[(.+?)\]\(((?:https?://|/)[^\s)]+)\)",
+        r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
+        escaped,
+    )
+    # Obsidian Wikilinks [[Link Target]] or [[Link Target|Display Text]]
+    escaped = re.sub(
+        r"\[\[([^|\]]+)(?:\|([^\]]+))?\]\]",
+        lambda m: m.group(2) if m.group(2) else m.group(1),
         escaped,
     )
 
     return escaped
+
 
 def parse_session_body(lines: list[str], excluded_keywords: list[str]) -> str:
     """Converts a session's markdown lines into structured HTML body content."""
@@ -159,7 +107,8 @@ def parse_session_body(lines: list[str], excluded_keywords: list[str]) -> str:
                 continue
 
             excluding_subsection = False
-            output.append(f"<h3>{parse_inline(heading_title)}</h3>")
+            tag = "h4" if stripped.startswith("#### ") else "h3"
+            output.append(f"<{tag}>{parse_inline(heading_title)}</{tag}>")
             continue
 
         # Skip content if inside an excluded section
@@ -201,9 +150,14 @@ def parse_session_body(lines: list[str], excluded_keywords: list[str]) -> str:
 
     return "\n".join(output)
 
+
 def natural_sort_key(filename: str):
     """Sorts filenames with embedded numbers naturally (e.g. Arc 1, Arc 2, Arc 10)."""
-    return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", filename)]
+    return [
+        float(text) if re.match(r"^\d+(\.\d+)?$", text) else text.lower()
+        for text in re.split(r"(\d+(?:\.\d+)?)", filename)
+    ]
+
 
 # ==========================================
 # Main Build Pipeline
@@ -211,24 +165,25 @@ def natural_sort_key(filename: str):
 def main():
     if not os.path.exists(INPUT_DIR):
         print(f"Error: Input directory not found at '{INPUT_DIR}'")
-        return
+        sys.exit(1)
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    os.makedirs(os.path.dirname(SESSION_DATA_JS), exist_ok=True)
+    os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
 
-    md_files = sorted([f for f in os.listdir(INPUT_DIR) if f.lower().endswith(".md")], key=natural_sort_key)
+    md_files = sorted(
+        [f for f in os.listdir(INPUT_DIR) if f.lower().endswith(".md")],
+        key=natural_sort_key,
+    )
     if not md_files:
         print("No markdown files found.")
         return
 
     all_sessions = []
-    groups = []
+    arcs = []
 
-    # 1. Parse markdown files into grouped sessions
     for md_file in md_files:
         base_name = os.path.splitext(md_file)[0].strip()
         slug_prefix = re.sub(r"[^a-zA-Z0-9]", "", base_name).lower()
-        
+
         file_path = os.path.join(INPUT_DIR, md_file)
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
@@ -246,14 +201,15 @@ def main():
 
                 sess_title = stripped[3:].strip()
                 order_num = len(file_sessions) + 1
-                filename = f"{slug_prefix}-{order_num:02d}.html"
+                session_id = f"{slug_prefix}-{order_num:02d}"
 
                 current_session = {
-                    "group_name": base_name,
+                    "id": session_id,
+                    "arc_id": slug_prefix,
+                    "arc_title": base_name,
                     "title": sess_title,
-                    "filename": filename,
-                    "file_path": f"/session-journal/{filename}",
-                    "lines": []
+                    "order": order_num,
+                    "lines": [],
                 }
             elif current_session:
                 current_session["lines"].append(line)
@@ -261,51 +217,51 @@ def main():
         if current_session:
             file_sessions.append(current_session)
 
-        if file_sessions:
-            groups.append({
-                "group_name": base_name,
-                "sessions": file_sessions
-            })
-            all_sessions.extend(file_sessions)
+        # Process session HTML for this arc
+        processed_arc_sessions = []
+        for s in file_sessions:
+            content_html = parse_session_body(s["lines"], EXCLUDED_KEYWORDS)
+            session_obj = {
+                "id": s["id"],
+                "arc_id": s["arc_id"],
+                "arc_title": s["arc_title"],
+                "title": s["title"],
+                "order": s["order"],
+                "content_html": content_html,
+            }
+            processed_arc_sessions.append(session_obj)
+            all_sessions.append(session_obj)
 
-    # 2. Write individual session HTML pages
-    for s in all_sessions:
-        content_html = parse_session_body(s["lines"], EXCLUDED_KEYWORDS)
-        page_html = SESSION_TEMPLATE.format(title=s["title"], content=content_html)
+        if processed_arc_sessions:
+            arcs.append(
+                {
+                    "id": slug_prefix,
+                    "title": base_name,
+                    "session_count": len(processed_arc_sessions),
+                    "sessions": [
+                        {
+                            "id": s["id"],
+                            "title": s["title"],
+                            "order": s["order"],
+                        }
+                        for s in processed_arc_sessions
+                    ],
+                }
+            )
 
-        out_path = os.path.join(OUTPUT_DIR, s["filename"])
-        with open(out_path, "w", encoding="utf-8") as f:
-            f.write(page_html)
-        print(f"Generated: {out_path}")
+    payload = {
+        "generated_at": None,
+        "total_arcs": len(arcs),
+        "total_sessions": len(all_sessions),
+        "arcs": arcs,
+        "sessions": all_sessions,
+    }
 
-    # 3. Generate sessionData.js
-    js_entries = []
-    for s in all_sessions:
-        js_entries.append(f'  {{ file: "{s["file_path"]}", title: "{s["title"]}" }},')
+    with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
 
-    js_content = "export const campaignSessions = [\n" + "\n".join(js_entries) + "\n];\n"
-    with open(SESSION_DATA_JS, "w", encoding="utf-8") as f:
-        f.write(js_content)
-    print(f"Updated: {SESSION_DATA_JS}")
-
-    # 4. Generate session-journal.html Table of Contents
-    arc_sections = []
-    for group in groups:
-        section = [
-            '      <details class="arc-details">',
-            f'        <summary>{group["group_name"]}</summary>',
-            '        <ul class="session-list">'
-        ]
-        for s in group["sessions"]:
-            section.append(f'          <li><a href="{s["file_path"]}">{s["title"]}</a></li>')
-        section.append('        </ul>')
-        section.append('      </details>\n')
-        arc_sections.append("\n".join(section))
-
-    journal_html = JOURNAL_TEMPLATE.format(arc_sections="\n".join(arc_sections))
-    with open(SESSION_JOURNAL_HTML, "w", encoding="utf-8") as f:
-        f.write(journal_html)
-    print(f"Generated: {SESSION_JOURNAL_HTML}")
+    print(f"Successfully generated campaign data: {OUTPUT_JSON}")
+    print(f"Total Arcs: {len(arcs)} | Total Sessions: {len(all_sessions)}")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,16 @@
-FROM nginx:alpine
-# Copy the entire public folder contents into the Nginx html directory
-COPY ./public/ /usr/share/nginx/html/
+# Stage 1: Build the React + TypeScript frontend
+FROM node:20-alpine AS builder
+WORKDIR /app
 
-# Copy the server configuration
-COPY ./default.conf /etc/nginx/conf.d/default.conf
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Stage 2: Serve the production static assets with Nginx
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY default.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
